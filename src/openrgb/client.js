@@ -12,6 +12,12 @@ class OpenRgbManager extends EventEmitter {
     this.devices = [];
     this._backgroundConnect = false;
     this._warnedOffline = false;
+    this._directModeDevices = new Set();
+  }
+
+  _resetDeviceState() {
+    this._directModeDevices.clear();
+    this.devices = [];
   }
 
   async connect() {
@@ -33,6 +39,7 @@ class OpenRgbManager extends EventEmitter {
     } catch (err) {
       this.status = "error";
       this.emit("status", this.status, err.message);
+      this._resetDeviceState();
       throw err;
     }
   }
@@ -87,26 +94,54 @@ class OpenRgbManager extends EventEmitter {
     return this.devices.find((d) => d.deviceId === deviceId);
   }
 
+  async ensureDirectMode(deviceId) {
+    if (!this.isConnected() || this._directModeDevices.has(deviceId)) return;
+
+    let device = this.getDevice(deviceId);
+    if (!device) {
+      this.devices = await this.client.getAllControllerData();
+      device = this.getDevice(deviceId);
+    }
+    if (!device) {
+      throw new Error(`OpenRGB device ${deviceId} not found`);
+    }
+
+    const direct = device.modes?.find((m) => m.name === "Direct");
+    if (direct) {
+      await this.client.updateMode(deviceId, "Direct");
+    } else {
+      this.client.setCustomMode(deviceId);
+    }
+    this._directModeDevices.add(deviceId);
+  }
+
   async updateFixture(compiled) {
     if (!this.isConnected()) return false;
     const { deviceId, zoneId, colors } = compiled;
 
     try {
-      if (zoneId != null) {
-        await this.client.updateZoneLeds(deviceId, zoneId, colors);
+      await this.ensureDirectMode(deviceId);
+
+      const device = this.getDevice(deviceId);
+      const useFullDevice =
+        zoneId == null ||
+        (device?.zones?.length === 1 && zoneId === 0);
+
+      if (useFullDevice) {
+        this.client.updateLeds(deviceId, colors);
       } else {
-        await this.client.updateLeds(deviceId, colors);
+        this.client.updateZoneLeds(deviceId, zoneId, colors);
       }
+
       if (this.status !== "connected") {
         this.status = "connected";
         this.emit("status", this.status);
       }
       return true;
     } catch (err) {
-      this.status = "error";
-      this.emit("status", this.status, err.message);
-      if (this.client) this.client.isConnected = false;
-      throw err;
+      console.error(`OpenRGB device ${deviceId}: ${err.message}`);
+      this.emit("status", "connected", err.message);
+      return false;
     }
   }
 
@@ -119,6 +154,7 @@ class OpenRgbManager extends EventEmitter {
         /* ignore */
       }
     }
+    this._resetDeviceState();
     this.status = "disconnected";
     this.emit("status", this.status);
   }

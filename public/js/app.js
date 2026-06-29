@@ -424,15 +424,44 @@ function showPanel(name) {
   });
 }
 
+function nextFixtureDefaults() {
+  const fixtures = state.config?.fixtures || [];
+  const usedDevices = new Set(fixtures.map((f) => f.deviceId));
+
+  let nextDmx = 1;
+  for (const fx of fixtures) {
+    const device = state.devices.find((d) => d.deviceId === fx.deviceId);
+    const ledCount = device?.ledCount ?? 0;
+    if (fx.mapping === "custom" && fx.pixels?.length) {
+      for (const p of fx.pixels) {
+        for (const ch of p.channels || []) nextDmx = Math.max(nextDmx, ch + 1);
+      }
+    } else {
+      nextDmx = Math.max(nextDmx, (fx.dmxStart || 1) + ledCount * 3);
+    }
+  }
+
+  const nextDevice =
+    state.devices.find((d) => d.ledCount > 0 && !usedDevices.has(d.deviceId)) ||
+    state.devices.find((d) => d.ledCount > 0) ||
+    state.devices[0];
+
+  return {
+    deviceId: nextDevice?.deviceId ?? 0,
+    dmxStart: nextDmx,
+  };
+}
+
 async function addFixture() {
   const id = `fixture-${Date.now()}`;
+  const defaults = nextFixtureDefaults();
   const body = {
     id,
     name: "New Fixture",
-    deviceId: state.devices[0]?.deviceId ?? 0,
+    deviceId: defaults.deviceId,
     zoneId: null,
-    source: { type: "artnet", universes: [1] },
-    dmxStart: 1,
+    source: { type: "artnet", universes: [0] },
+    dmxStart: defaults.dmxStart,
     colorOrder: "RGB",
     mapping: "linear",
     pixels: [],

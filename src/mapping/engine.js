@@ -110,10 +110,32 @@ function validateFixtureChannels(fixtures) {
     for (const p of pixels) {
       if (!p.channels) continue;
       for (const ch of p.channels) {
-        const key = `${f.source?.type}:${(f.source?.universes || []).join("+")}:${ch}`;
+        const universes = f.source?.universes || [];
+        const key = `${f.source?.type}:${universes.join("+")}:${ch}`;
         if (seen.has(key)) {
           warnings.push(
             `Channel ${ch} used by fixture "${f.id}" and "${seen.get(key)}" (may cause conflicts)`
+          );
+        } else {
+          seen.set(key, f.id);
+        }
+      }
+    }
+  }
+  return warnings;
+}
+
+function validateCompiledChannels(compiledFixtures) {
+  const warnings = [];
+  const seen = new Map();
+  for (const f of compiledFixtures) {
+    for (const p of f.pixels) {
+      if (!p.channels) continue;
+      for (const ch of p.channels) {
+        const key = `${f.source.type}:${f.source.universes.join("+")}:${ch}`;
+        if (seen.has(key)) {
+          warnings.push(
+            `DMX channel ${ch} used by "${f.id}" and "${seen.get(key)}" on the same universe`
           );
         } else {
           seen.set(key, f.id);
@@ -131,4 +153,5 @@ module.exports = {
   mapFixture,
   colorsHash,
   validateFixtureChannels,
+  validateCompiledChannels,
 };

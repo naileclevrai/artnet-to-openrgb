@@ -1,5 +1,5 @@
 const { EventEmitter } = require("events");
-const { compileFixture, mapFixture, colorsHash, validateFixtureChannels } = require("./mapping/engine");
+const { compileFixture, mapFixture, colorsHash, validateCompiledChannels } = require("./mapping/engine");
 const { startArtNetReceiver } = require("./protocols/artnet");
 const { startSacnReceiver } = require("./protocols/sacn");
 const { DmxStore } = require("./dmx/store");
@@ -52,9 +52,12 @@ class Bridge extends EventEmitter {
           continue;
         }
         this.compiledFixtures.push(compileFixture(fixture, device));
+        console.log(
+          `Fixture "${fixture.id}" → device [${fixture.deviceId}] ${device.name} (${this.compiledFixtures.at(-1).zoneCount} LEDs, DMX from ${fixture.dmxStart})`
+        );
       }
 
-      const warnings = validateFixtureChannels(this.config.fixtures);
+      const warnings = validateCompiledChannels(this.compiledFixtures);
       for (const w of warnings) console.warn(w);
 
       if (this.compiledFixtures.length === 0 && this.config.fixtures.length > 0) {
