@@ -20,13 +20,30 @@ class DmxStore {
     this.lastUpdate.set(key, Date.now());
   }
 
+  _getLatestBuffer(protocol) {
+    let latest = null;
+    let latestTs = 0;
+    for (const [key, ts] of this.lastUpdate) {
+      if (!key.startsWith(`${protocol}:`)) continue;
+      if (ts > latestTs) {
+        latestTs = ts;
+        latest = this.buffers.get(key);
+      }
+    }
+    return latest;
+  }
+
   getChannel(protocol, universes, channel) {
     if (channel < 1) return 0;
     const index = Math.floor((channel - 1) / 512);
     if (index >= universes.length) return 0;
     const universe = universes[index];
     const offset = (channel - 1) % 512;
-    const buffer = this.buffers.get(this._key(protocol, universe));
+    const key = this._key(protocol, universe);
+    let buffer = this.buffers.get(key);
+    if (!buffer) {
+      buffer = this._getLatestBuffer(protocol);
+    }
     return buffer ? buffer[offset] : 0;
   }
 

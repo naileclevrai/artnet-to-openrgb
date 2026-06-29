@@ -33,27 +33,46 @@ function parseArtNetUniverse(value) {
   return num;
 }
 
-function parseUniversesList(value) {
-  if (Array.isArray(value)) return [...new Set(value.map(Number))];
-  const raw = value ?? "1";
-  const list = String(raw)
-    .split(",")
-    .map((p) => Number(p.trim()))
-    .filter((n) => !Number.isNaN(n));
-  if (list.length === 0 || list.some((u) => u < 1 || u > 63999)) {
-    throw new Error(`Invalid universes list: "${raw}"`);
+function parseUniversesList(value, { min = 0, max = 63999 } = {}) {
+  let list;
+  if (Array.isArray(value)) {
+    list = [...new Set(value.map(Number).filter((n) => !Number.isNaN(n)))];
+  } else {
+    const raw = value ?? "";
+    list = String(raw)
+      .split(",")
+      .map((p) => Number(p.trim()))
+      .filter((n) => !Number.isNaN(n));
+    if (list.length === 0 && raw === "") return [];
   }
-  return [...new Set(list)];
+  if (list.length === 0) return [];
+  if (list.some((u) => !Number.isInteger(u) || u < min || u > max)) {
+    throw new Error(`Invalid universes list (expected ${min}-${max}): ${JSON.stringify(value)}`);
+  }
+  return list;
+}
+
+function defaultUniversesForType(type) {
+  return type === "sacn" ? [1] : [0];
 }
 
 function normalizeFixture(fixture, index) {
   const id = fixture.id || `fixture-${index}`;
-  const source = fixture.source || { type: "artnet", universe: 1 };
+  const source = fixture.source || { type: "artnet", universe: 0 };
   const type = source.type || "artnet";
-  const universes =
-    source.universes != null
-      ? parseUniversesList(source.universes)
-      : [source.universe ?? 1];
+  const min = type === "sacn" ? 1 : 0;
+
+  let universes;
+  if (source.universes != null) {
+    universes = parseUniversesList(source.universes, { min });
+  } else if (source.universe != null) {
+    universes = parseUniversesList([source.universe], { min });
+  } else {
+    universes = defaultUniversesForType(type);
+  }
+  if (universes.length === 0) {
+    universes = defaultUniversesForType(type);
+  }
 
   return {
     id,
@@ -113,7 +132,7 @@ function loadConfig(configPath) {
     merged.artnet.universe = parseArtNetUniverse(merged.artnet.universe);
   }
   if (merged.sacn.universes) {
-    merged.sacn.universes = parseUniversesList(merged.sacn.universes);
+    merged.sacn.universes = parseUniversesList(merged.sacn.universes, { min: 1 });
   }
   return validateConfig(merged);
 }
@@ -146,6 +165,7 @@ module.exports = {
   validateConfig,
   parseArtNetUniverse,
   parseUniversesList,
+  defaultUniversesForType,
   normalizeFixture,
   collectRequiredUniverses,
 };

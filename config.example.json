@@ -25,7 +25,7 @@
       "name": "Keyboard Main",
       "deviceId": 0,
       "zoneId": null,
-      "source": { "type": "artnet", "universes": [1] },
+      "source": { "type": "artnet", "universes": [0] },
       "dmxStart": 1,
       "colorOrder": "RGB",
       "mapping": "linear",

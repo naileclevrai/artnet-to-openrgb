@@ -16,8 +16,13 @@ function toast(msg, ok = false) {
   const el = $("#toast");
   el.textContent = msg;
   el.className = "toast show" + (ok ? " ok" : "");
+  const status = $("#statusbar-msg");
+  if (status) status.textContent = msg;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+    if (status) status.textContent = "OpenRGB Fixture Bridge v2.0";
+  }, 3200);
 }
 
 async function api(path, opts = {}) {
@@ -96,7 +101,7 @@ function renderPreviewGrid() {
   grid.innerHTML = "";
 
   if (!Object.keys(state.previews).length) {
-    grid.innerHTML = '<p class="empty-state">Waiting for DMX data…</p>';
+    grid.innerHTML = '<p class="empty-state" style="margin:0;border:none">Waiting for DMX data…</p>';
     return;
   }
 
@@ -359,7 +364,11 @@ async function saveFixture() {
     zoneId: f.zoneId.value === "" ? null : Number(f.zoneId.value),
     source: {
       type: f.sourceType.value,
-      universes: f.sourceUniverses.value.split(",").map((x) => Number(x.trim())).filter(Boolean),
+      universes: (() => {
+        const list = f.sourceUniverses.value.split(",").map((x) => Number(x.trim())).filter((n) => !Number.isNaN(n));
+        if (list.length) return list;
+        return f.sourceType.value === "sacn" ? [1] : [0];
+      })(),
     },
     dmxStart: Number(f.dmxStart.value),
     colorOrder: f.colorOrder.value,

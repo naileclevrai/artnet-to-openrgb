@@ -3,294 +3,295 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PIXEL/Desk — OpenRGB Fixture Bridge</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <title>OpenRGB Fixture Bridge</title>
   <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-  <div class="grid-bg" aria-hidden="true"></div>
-
-  <div class="app">
-    <header class="deck-header">
-      <div class="brand-block">
-        <div class="brand-glyph">
-          <span class="glyph-ring"></span>
-          <span class="glyph-core"></span>
-        </div>
-        <div>
-          <p class="brand-eyebrow">Art-Net · sACN · OpenRGB</p>
-          <h1 class="brand-title">PIXEL<span class="brand-slash">/</span>Desk</h1>
+  <div class="xp-desktop">
+    <div class="xp-window main-window">
+      <div class="xp-titlebar">
+        <div class="xp-titlebar-icon" aria-hidden="true"></div>
+        <span class="xp-titlebar-text">OpenRGB Fixture Bridge — Art-Net / sACN</span>
+        <div class="xp-titlebar-buttons" aria-hidden="true">
+          <span class="xp-wbtn">_</span>
+          <span class="xp-wbtn">□</span>
+          <span class="xp-wbtn xp-wbtn-close">×</span>
         </div>
       </div>
 
-      <div class="meter-strip" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span>
+      <div class="xp-menubar">
+        <span>File</span>
+        <span>Edit</span>
+        <span>View</span>
+        <span>Help</span>
       </div>
 
-      <div class="telemetry">
-        <div id="openrgb-status" class="tel tel-off" data-label="OpenRGB">
-          <span class="tel-led"></span>
-          <span class="tel-val">offline</span>
-        </div>
-        <div id="bridge-status" class="tel tel-on" data-label="Bridge">
-          <span class="tel-led"></span>
-          <span class="tel-val">active</span>
-        </div>
-        <div id="fps-status" class="tel tel-fps" data-label="Output">
-          <span class="tel-led"></span>
-          <span class="tel-val">0 FPS</span>
+      <div class="xp-toolbar">
+        <div class="telemetry">
+          <div id="openrgb-status" class="tel tel-off" data-label="OpenRGB">
+            <span class="tel-led"></span>
+            <span class="tel-val">offline</span>
+          </div>
+          <div id="bridge-status" class="tel tel-on" data-label="Bridge">
+            <span class="tel-led"></span>
+            <span class="tel-val">active</span>
+          </div>
+          <div id="fps-status" class="tel tel-fps" data-label="FPS">
+            <span class="tel-led"></span>
+            <span class="tel-val">0 FPS</span>
+          </div>
         </div>
       </div>
-    </header>
 
-    <div class="deck-body">
-      <aside class="rack-nav">
-        <p class="rack-label">Modules</p>
-        <button class="rack-btn active" data-panel="setup">
-          <span class="rack-num">01</span>
-          <span class="rack-name">Protocol</span>
-        </button>
-        <button class="rack-btn" data-panel="fixtures">
-          <span class="rack-num">02</span>
-          <span class="rack-name">Fixtures</span>
-        </button>
-        <button class="rack-btn" data-panel="editor">
-          <span class="rack-num">03</span>
-          <span class="rack-name">Patch</span>
-        </button>
-        <button class="rack-btn" data-panel="monitor">
-          <span class="rack-num">04</span>
-          <span class="rack-name">Monitor</span>
-        </button>
-        <div class="rack-footer">
-          <span class="rack-hint">Fixture patch UI</span>
-          <span class="rack-ver">v2.0</span>
-        </div>
-      </aside>
+      <div class="deck-body">
+        <aside class="rack-nav xp-sidebar">
+          <p class="rack-label">Address Book</p>
+          <button class="rack-btn active" data-panel="setup">
+            <span class="rack-icon"></span>
+            <span class="rack-name">Protocol Setup</span>
+          </button>
+          <button class="rack-btn" data-panel="fixtures">
+            <span class="rack-icon"></span>
+            <span class="rack-name">Fixtures</span>
+          </button>
+          <button class="rack-btn" data-panel="editor">
+            <span class="rack-icon"></span>
+            <span class="rack-name">Channel Patch</span>
+          </button>
+          <button class="rack-btn" data-panel="monitor">
+            <span class="rack-icon"></span>
+            <span class="rack-name">Live Monitor</span>
+          </button>
+        </aside>
 
-      <main class="deck-main">
-        <section id="panel-setup" class="deck-panel active">
-          <header class="panel-head">
-            <div>
-              <h2>Protocol &amp; Connection</h2>
-              <p class="panel-sub">Network ingress and OpenRGB SDK endpoint</p>
+        <main class="deck-main xp-client">
+          <section id="panel-setup" class="deck-panel active">
+            <header class="panel-head">
+              <h2>Protocol and Connection Settings</h2>
+            </header>
+
+            <form id="setup-form" class="field-matrix">
+              <fieldset class="field-group">
+                <legend>Transport</legend>
+                <label class="field">
+                  <span>Protocol:</span>
+                  <select name="protocol">
+                    <option value="both">Art-Net + sACN</option>
+                    <option value="artnet">Art-Net only</option>
+                    <option value="sacn">sACN only</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Output FPS:</span>
+                  <input name="fps" type="number" min="1" max="120" />
+                </label>
+                <label class="field field-check">
+                  <input name="debug" type="checkbox" />
+                  <span>Enable debug logging</span>
+                </label>
+              </fieldset>
+
+              <fieldset class="field-group">
+                <legend>OpenRGB SDK</legend>
+                <label class="field">
+                  <span>Host address:</span>
+                  <input name="openrgbHost" />
+                </label>
+                <label class="field">
+                  <span>Port:</span>
+                  <input name="openrgbPort" type="number" />
+                </label>
+              </fieldset>
+
+              <fieldset class="field-group">
+                <legend>Art-Net</legend>
+                <label class="field">
+                  <span>UDP port:</span>
+                  <input name="artnetPort" type="number" />
+                </label>
+                <label class="field">
+                  <span>Universe filter:</span>
+                  <input name="artnetUniverse" placeholder="(all)" />
+                </label>
+                <label class="field field-check">
+                  <input name="artnetSync" type="checkbox" />
+                  <span>Wait for ArtSync</span>
+                </label>
+              </fieldset>
+
+              <fieldset class="field-group">
+                <legend>sACN (E1.31)</legend>
+                <label class="field">
+                  <span>UDP port:</span>
+                  <input name="sacnPort" type="number" />
+                </label>
+                <label class="field">
+                  <span>Universes:</span>
+                  <input name="sacnUniverses" placeholder="1, 2" />
+                </label>
+                <label class="field">
+                  <span>Network interface:</span>
+                  <input name="sacnIface" placeholder="optional" />
+                </label>
+              </fieldset>
+            </form>
+
+            <div class="panel-actions">
+              <button id="save-setup" class="btn btn-accent">OK</button>
             </div>
-          </header>
+          </section>
 
-          <form id="setup-form" class="field-matrix">
-            <fieldset class="field-group">
-              <legend>Transport</legend>
-              <label class="field">
-                <span>Protocol</span>
-                <select name="protocol">
-                  <option value="both">Art-Net + sACN</option>
-                  <option value="artnet">Art-Net only</option>
-                  <option value="sacn">sACN only</option>
-                </select>
+          <section id="panel-fixtures" class="deck-panel">
+            <header class="panel-head">
+              <h2>Installed Fixtures</h2>
+              <button id="add-fixture" class="btn btn-accent">Add...</button>
+            </header>
+            <div id="fixture-list" class="fixture-rack"></div>
+            <p id="fixture-empty" class="empty-state hidden">No fixtures installed. Click Add to create one.</p>
+          </section>
+
+          <section id="panel-editor" class="deck-panel">
+            <header class="panel-head">
+              <h2>DMX Channel Patch</h2>
+              <label class="field field-inline">
+                <span>Fixture:</span>
+                <select id="editor-fixture-select" class="fixture-picker"></select>
               </label>
-              <label class="field">
-                <span>Output FPS</span>
-                <input name="fps" type="number" min="1" max="120" />
-              </label>
-              <label class="field field-check">
-                <input name="debug" type="checkbox" />
-                <span>Debug logging</span>
-              </label>
+            </header>
+
+            <fieldset class="field-group field-group-flat">
+              <legend>Properties</legend>
+              <form id="editor-form" class="field-matrix field-matrix-compact">
+                <label class="field"><span>Name:</span><input name="name" /></label>
+                <label class="field">
+                  <span>Device:</span>
+                  <select name="deviceId" id="editor-device"></select>
+                </label>
+                <label class="field">
+                  <span>Zone:</span>
+                  <select name="zoneId" id="editor-zone">
+                    <option value="">Full device</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Source:</span>
+                  <select name="sourceType">
+                    <option value="artnet">Art-Net</option>
+                    <option value="sacn">sACN</option>
+                  </select>
+                </label>
+                <label class="field"><span>Universes:</span><input name="sourceUniverses" placeholder="0" /></label>
+                <label class="field"><span>DMX start:</span><input name="dmxStart" type="number" min="1" /></label>
+                <label class="field">
+                  <span>Color order:</span>
+                  <select name="colorOrder">
+                    <option>RGB</option><option>GRB</option><option>BGR</option>
+                    <option>RBG</option><option>GBR</option><option>BRG</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Mapping:</span>
+                  <select name="mapping">
+                    <option value="linear">Linear</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+              </form>
             </fieldset>
 
-            <fieldset class="field-group">
-              <legend>OpenRGB</legend>
-              <label class="field">
-                <span>Host</span>
-                <input name="openrgbHost" />
+            <div class="toolbar">
+              <button id="auto-patch" class="btn">Auto-patch</button>
+              <button id="clear-patch" class="btn">Clear</button>
+              <button id="export-patch" class="btn">Export...</button>
+              <label class="btn file-btn">
+                Import...
+                <input id="import-patch" type="file" accept=".json" hidden />
               </label>
-              <label class="field">
-                <span>Port</span>
-                <input name="openrgbPort" type="number" />
-              </label>
-            </fieldset>
+              <button id="save-fixture" class="btn btn-accent">Save</button>
+            </div>
 
-            <fieldset class="field-group">
-              <legend>Art-Net</legend>
-              <label class="field">
-                <span>UDP Port</span>
-                <input name="artnetPort" type="number" />
-              </label>
-              <label class="field">
-                <span>Universe filter</span>
-                <input name="artnetUniverse" placeholder="all universes" />
-              </label>
-              <label class="field field-check">
-                <input name="artnetSync" type="checkbox" />
-                <span>ArtSync gate</span>
-              </label>
-            </fieldset>
-
-            <fieldset class="field-group">
-              <legend>sACN</legend>
-              <label class="field">
-                <span>UDP Port</span>
-                <input name="sacnPort" type="number" />
-              </label>
-              <label class="field">
-                <span>Universes</span>
-                <input name="sacnUniverses" placeholder="1, 2" />
-              </label>
-              <label class="field">
-                <span>Interface</span>
-                <input name="sacnIface" placeholder="optional NIC IP" />
-              </label>
-            </fieldset>
-          </form>
-
-          <div class="panel-actions">
-            <button id="save-setup" class="btn btn-accent">
-              <span class="btn-glow"></span>
-              Apply configuration
-            </button>
-          </div>
-        </section>
-
-        <section id="panel-fixtures" class="deck-panel">
-          <header class="panel-head">
-            <div>
-              <h2>Fixture Rack</h2>
-              <p class="panel-sub">OpenRGB targets patched to DMX universes</p>
-            </div>
-            <button id="add-fixture" class="btn btn-accent btn-sm">+ New fixture</button>
-          </header>
-          <div id="fixture-list" class="fixture-rack"></div>
-          <p id="fixture-empty" class="empty-state hidden">No fixtures yet — add one to start patching pixels.</p>
-        </section>
-
-        <section id="panel-editor" class="deck-panel">
-          <header class="panel-head">
-            <div>
-              <h2>Channel Patch</h2>
-              <p class="panel-sub">Map DMX channels to OpenRGB pixels</p>
-            </div>
-            <select id="editor-fixture-select" class="fixture-picker"></select>
-          </header>
-
-          <form id="editor-form" class="field-matrix field-matrix-compact">
-            <label class="field"><span>Name</span><input name="name" /></label>
-            <label class="field">
-              <span>Device</span>
-              <select name="deviceId" id="editor-device"></select>
-            </label>
-            <label class="field">
-              <span>Zone</span>
-              <select name="zoneId" id="editor-zone">
-                <option value="">Full device</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Source</span>
-              <select name="sourceType">
-                <option value="artnet">Art-Net</option>
-                <option value="sacn">sACN</option>
-              </select>
-            </label>
-            <label class="field"><span>Universes</span><input name="sourceUniverses" placeholder="1 or 1,2" /></label>
-            <label class="field"><span>DMX start</span><input name="dmxStart" type="number" min="1" /></label>
-            <label class="field">
-              <span>Color order</span>
-              <select name="colorOrder">
-                <option>RGB</option><option>GRB</option><option>BGR</option>
-                <option>RBG</option><option>GBR</option><option>BRG</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Mapping</span>
-              <select name="mapping">
-                <option value="linear">Linear</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-          </form>
-
-          <div class="toolbar">
-            <button id="auto-patch" class="btn">Auto-patch</button>
-            <button id="clear-patch" class="btn">Clear</button>
-            <button id="export-patch" class="btn">Export</button>
-            <label class="btn file-btn">
-              Import
-              <input id="import-patch" type="file" accept=".json" hidden />
-            </label>
-            <button id="save-fixture" class="btn btn-accent btn-sm">Save fixture</button>
-          </div>
-
-          <div class="patch-desk">
-            <div class="patch-desk-head">
-              <span>LED</span>
-              <span>Label</span>
-              <span class="ch-head ch-r">R</span>
-              <span class="ch-head ch-g">G</span>
-              <span class="ch-head ch-b">B</span>
-              <span>Out</span>
-            </div>
-            <div class="table-wrap">
-              <table class="patch-table">
-                <tbody id="patch-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section id="panel-monitor" class="deck-panel">
-          <header class="panel-head">
-            <div>
-              <h2>Live Bus</h2>
-              <p class="panel-sub">Real-time DMX ingress and output telemetry</p>
-            </div>
-          </header>
-
-          <div class="monitor-grid">
-            <div class="vu-card">
-              <span class="vu-label">FPS</span>
-              <span id="mon-fps" class="vu-value">0</span>
-              <div class="vu-bar"><div id="vu-fps" class="vu-fill"></div></div>
-            </div>
-            <div class="vu-card">
-              <span class="vu-label">Packets/s</span>
-              <span id="mon-pps" class="vu-value">0</span>
-              <div class="vu-bar"><div id="vu-pps" class="vu-fill"></div></div>
-            </div>
-            <div class="vu-card">
-              <span class="vu-label">Updates</span>
-              <span id="mon-updates" class="vu-value">0</span>
-            </div>
-            <div class="vu-card">
-              <span class="vu-label">Skips</span>
-              <span id="mon-skips" class="vu-value">0</span>
-            </div>
-            <div class="bus-card">
-              <span class="bus-label">Last source</span>
-              <span id="mon-source" class="bus-value">—</span>
-            </div>
-            <div class="bus-card">
-              <span class="bus-label">Universe</span>
-              <span id="mon-universe" class="bus-value">—</span>
-            </div>
-            <div class="bus-card bus-wide">
-              <span class="bus-label">Channels 1 · 2 · 3</span>
-              <div class="ch-meters">
-                <div class="ch-meter"><span>R</span><div class="ch-bar"><div id="meter-r" class="ch-fill"></div></div><code id="val-r">0</code></div>
-                <div class="ch-meter"><span>G</span><div class="ch-bar"><div id="meter-g" class="ch-fill"></div></div><code id="val-g">0</code></div>
-                <div class="ch-meter"><span>B</span><div class="ch-bar"><div id="meter-b" class="ch-fill"></div></div><code id="val-b">0</code></div>
+            <fieldset class="field-group patch-desk">
+              <legend>Pixel / Channel Grid</legend>
+              <div class="patch-desk-head">
+                <span>LED #</span>
+                <span>Label</span>
+                <span class="ch-head ch-r">R</span>
+                <span class="ch-head ch-g">G</span>
+                <span class="ch-head ch-b">B</span>
+                <span>Live</span>
               </div>
-            </div>
-          </div>
+              <div class="table-wrap">
+                <table class="patch-table">
+                  <tbody id="patch-body"></tbody>
+                </table>
+              </div>
+            </fieldset>
+          </section>
 
-          <h3 class="preview-title">Fixture output</h3>
-          <div id="preview-grid" class="preview-stage"></div>
-        </section>
-      </main>
+          <section id="panel-monitor" class="deck-panel">
+            <header class="panel-head">
+              <h2>Live Monitor</h2>
+            </header>
+
+            <fieldset class="field-group">
+              <legend>Performance</legend>
+              <div class="monitor-grid">
+                <div class="vu-card">
+                  <span class="vu-label">FPS</span>
+                  <span id="mon-fps" class="vu-value">0</span>
+                  <div class="vu-bar"><div id="vu-fps" class="vu-fill"></div></div>
+                </div>
+                <div class="vu-card">
+                  <span class="vu-label">Packets/s</span>
+                  <span id="mon-pps" class="vu-value">0</span>
+                  <div class="vu-bar"><div id="vu-pps" class="vu-fill"></div></div>
+                </div>
+                <div class="vu-card">
+                  <span class="vu-label">Updates</span>
+                  <span id="mon-updates" class="vu-value">0</span>
+                </div>
+                <div class="vu-card">
+                  <span class="vu-label">Skips</span>
+                  <span id="mon-skips" class="vu-value">0</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>DMX Bus</legend>
+              <div class="bus-row">
+                <div class="bus-card">
+                  <span class="bus-label">Last source:</span>
+                  <span id="mon-source" class="bus-value">—</span>
+                </div>
+                <div class="bus-card">
+                  <span class="bus-label">Universe:</span>
+                  <span id="mon-universe" class="bus-value">—</span>
+                </div>
+              </div>
+              <div class="bus-card bus-wide">
+                <span class="bus-label">Channels 1, 2, 3</span>
+                <div class="ch-meters">
+                  <div class="ch-meter"><span>R</span><div class="ch-bar"><div id="meter-r" class="ch-fill ch-fill-r"></div></div><code id="val-r">0</code></div>
+                  <div class="ch-meter"><span>G</span><div class="ch-bar"><div id="meter-g" class="ch-fill ch-fill-g"></div></div><code id="val-g">0</code></div>
+                  <div class="ch-meter"><span>B</span><div class="ch-bar"><div id="meter-b" class="ch-fill ch-fill-b"></div></div><code id="val-b">0</code></div>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>Fixture Preview</legend>
+              <div id="preview-grid" class="preview-stage"></div>
+            </fieldset>
+          </section>
+        </main>
+      </div>
+
+      <div class="xp-statusbar">
+        <span class="xp-statusbar-section">Ready</span>
+        <span class="xp-statusbar-section xp-statusbar-grow" id="statusbar-msg">OpenRGB Fixture Bridge v2.0</span>
+        <span class="xp-statusbar-section" id="statusbar-net">NUM</span>
+      </div>
     </div>
   </div>
 

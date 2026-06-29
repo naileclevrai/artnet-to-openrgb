@@ -90,6 +90,14 @@ class Bridge extends EventEmitter {
         console.log(
           `[${source}] universe ${universe} ch1-3=${this.stats.lastChannels.join(",")}${meta?.sourceName ? ` from ${meta.sourceName}` : ""}`
         );
+        for (const f of this.compiledFixtures) {
+          if (f.source.type !== source) continue;
+          if (!f.source.universes.includes(universe)) {
+            console.warn(
+              `Fixture "${f.id}" listens on universe(s) [${f.source.universes.join(", ")}] but packet arrived on ${universe}`
+            );
+          }
+        }
       }
       this.emit("dmx", { universe, source, meta });
     };
