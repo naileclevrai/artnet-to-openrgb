@@ -1,7 +1,6 @@
 const state = {
   config: null,
   devices: [],
-  fixtures: [],
   selectedFixtureId: null,
   previews: {},
   status: null,
@@ -10,6 +9,16 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
+
+let toastTimer;
+
+function toast(msg, ok = false) {
+  const el = $("#toast");
+  el.textContent = msg;
+  el.className = "toast show" + (ok ? " ok" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+}
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -48,41 +57,64 @@ function connectWs() {
 
 function updateOpenRgbPill(s) {
   const el = $("#openrgb-status");
-  el.textContent = `OpenRGB: ${s}`;
-  el.className = "pill " + (s === "connected" ? "pill-on" : s === "reconnecting" ? "pill-warn" : "pill-off");
+  const label = s === "connected" ? "online" : s === "reconnecting" ? "retry" : "offline";
+  el.querySelector(".tel-val").textContent = label;
+  el.className =
+    "tel " + (s === "connected" ? "tel-on" : s === "reconnecting" ? "tel-warn" : "tel-off");
 }
 
 function updateMonitor() {
   if (!state.status?.stats) return;
   const s = state.status.stats;
-  $("#fps-status").textContent = `${s.fps} FPS`;
+
+  $("#fps-status .tel-val").textContent = `${s.fps} FPS`;
   $("#mon-fps").textContent = s.fps;
   $("#mon-pps").textContent = s.packetRate;
   $("#mon-updates").textContent = s.updates;
   $("#mon-skips").textContent = s.skips;
   $("#mon-source").textContent = s.lastSource || "—";
   $("#mon-universe").textContent = s.lastUniverse ?? "—";
-  $("#mon-ch").textContent = (s.lastChannels || [0, 0, 0]).join(", ");
+
+  const ch = s.lastChannels || [0, 0, 0];
+  $("#val-r").textContent = ch[0];
+  $("#val-g").textContent = ch[1];
+  $("#val-b").textContent = ch[2];
+  $("#meter-r").style.width = `${(ch[0] / 255) * 100}%`;
+  $("#meter-g").style.width = `${(ch[1] / 255) * 100}%`;
+  $("#meter-b").style.width = `${(ch[2] / 255) * 100}%`;
+
+  const vuFps = $("#vu-fps");
+  const vuPps = $("#vu-pps");
+  if (vuFps) vuFps.style.width = `${Math.min(100, (s.fps / 60) * 100)}%`;
+  if (vuPps) vuPps.style.width = `${Math.min(100, (s.packetRate / 120) * 100)}%`;
+
   renderPreviewGrid();
 }
 
 function renderPreviewGrid() {
   const grid = $("#preview-grid");
   grid.innerHTML = "";
+
+  if (!Object.keys(state.previews).length) {
+    grid.innerHTML = '<p class="empty-state">Waiting for DMX data…</p>';
+    return;
+  }
+
   for (const [fid, colors] of Object.entries(state.previews)) {
-    const label = document.createElement("div");
-    label.style.width = "100%";
-    label.style.fontSize = "0.7rem";
-    label.style.color = "#8b95a8";
-    label.textContent = fid;
-    grid.appendChild(label);
+    const block = document.createElement("div");
+    block.className = "preview-fixture";
+    block.innerHTML = `<div class="preview-fixture-name">${fid}</div>`;
+    const strip = document.createElement("div");
+    strip.className = "preview-strip";
     for (const c of colors) {
       const d = document.createElement("div");
       d.className = "preview-pixel";
       d.style.background = `rgb(${c.red},${c.green},${c.blue})`;
-      d.title = `rgb(${c.red},${c.green},${c.blue})`;
-      grid.appendChild(d);
+      d.title = `rgb(${c.red}, ${c.green}, ${c.blue})`;
+      strip.appendChild(d);
     }
+    block.appendChild(strip);
+    grid.appendChild(block);
   }
 }
 
@@ -99,7 +131,7 @@ function fillSetupForm() {
   f.artnetUniverse.value = c.artnet.universe ?? "";
   f.artnetSync.checked = c.artnet.sync;
   f.sacnPort.value = c.sacn.port;
-  f.sacnUniverses.value = (c.sacn.universes || []).join(",");
+  f.sacnUniverses.value = (c.sacn.universes || []).join(", ");
   f.sacnIface.value = c.sacn.iface || "";
 }
 
@@ -119,26 +151,40 @@ async function saveSetup() {
   c.sacn.universes = f.sacnUniverses.value.split(",").map((x) => Number(x.trim())).filter(Boolean);
   c.sacn.iface = f.sacnIface.value.trim() || null;
   state.config = await api("/api/config", { method: "PUT", body: JSON.stringify(c) });
+  toast("Configuration applied", true);
 }
 
 function renderFixtureCards() {
   const list = $("#fixture-list");
+  const empty = $("#fixture-empty");
+  const fixtures = state.config?.fixtures || [];
   list.innerHTML = "";
-  for (const fx of state.config?.fixtures || []) {
-    const card = document.createElement("div");
+
+  if (!fixtures.length) {
+    empty?.classList.remove("hidden");
+    return;
+  }
+  empty?.classList.add("hidden");
+
+  fixtures.forEach((fx, i) => {
+    const card = document.createElement("article");
     card.className = "fixture-card";
+    card.style.animationDelay = `${i * 0.06}s`;
     card.innerHTML = `
       <h3>${fx.name}</h3>
-      <p>ID: ${fx.id}</p>
-      <p>Device ${fx.deviceId}${fx.zoneId != null ? ` / Zone ${fx.zoneId}` : ""}</p>
-      <p>${fx.source.type.toUpperCase()} universe ${fx.source.universes?.join("+") || "?"}</p>
-      <p>DMX start ${fx.dmxStart} · ${fx.mapping} · ${fx.colorOrder}</p>
+      <div class="fixture-meta">
+        <span>ID <strong>${fx.id}</strong></span>
+        <span>Device <strong>${fx.deviceId}</strong>${fx.zoneId != null ? ` · Zone ${fx.zoneId}` : ""}</span>
+        <span>${fx.source.type.toUpperCase()} · U${fx.source.universes?.join("+") || "?"}</span>
+        <span>DMX ${fx.dmxStart} · ${fx.mapping} · ${fx.colorOrder}</span>
+      </div>
       <div class="actions">
-        <button class="btn edit-fixture" data-id="${fx.id}">Edit</button>
-        <button class="btn delete-fixture" data-id="${fx.id}">Delete</button>
+        <button class="btn edit-fixture" data-id="${fx.id}">Edit patch</button>
+        <button class="btn delete-fixture" data-id="${fx.id}">Remove</button>
       </div>`;
     list.appendChild(card);
-  }
+  });
+
   list.querySelectorAll(".edit-fixture").forEach((btn) => {
     btn.onclick = () => {
       state.selectedFixtureId = btn.dataset.id;
@@ -146,13 +192,15 @@ function renderFixtureCards() {
       loadEditorFixture();
     };
   });
+
   list.querySelectorAll(".delete-fixture").forEach((btn) => {
     btn.onclick = async () => {
-      if (!confirm(`Delete fixture "${btn.dataset.id}"?`)) return;
+      if (!confirm(`Remove fixture "${btn.dataset.id}"?`)) return;
       await api(`/api/fixtures/${btn.dataset.id}`, { method: "DELETE" });
       state.config = await api("/api/config");
       renderFixtureCards();
       populateEditorSelect();
+      toast("Fixture removed", true);
     };
   });
 }
@@ -254,6 +302,10 @@ function renderPatchTable(fx) {
     const defaultCh = [dmxStart + i * 3, dmxStart + i * 3 + 1, dmxStart + i * 3 + 2];
     const ch = pixelMap.get(absIndex) || defaultCh;
     const preview = state.previews[fx.id]?.[i];
+    const r = preview?.red ?? 0;
+    const g = preview?.green ?? 0;
+    const b = preview?.blue ?? 0;
+    const live = r + g + b > 0;
 
     const tr = document.createElement("tr");
     tr.dataset.ledIndex = absIndex;
@@ -263,7 +315,7 @@ function renderPatchTable(fx) {
       <td><input type="number" class="ch-r" min="1" max="2048" value="${ch[0]}" /></td>
       <td><input type="number" class="ch-g" min="1" max="2048" value="${ch[1]}" /></td>
       <td><input type="number" class="ch-b" min="1" max="2048" value="${ch[2]}" /></td>
-      <td><span class="swatch" style="background:rgb(${preview?.red ?? 0},${preview?.green ?? 0},${preview?.blue ?? 0})"></span></td>`;
+      <td><span class="swatch${live ? " swatch-live" : ""}" style="background:rgb(${r},${g},${b});color:rgb(${r},${g},${b})"></span></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -276,7 +328,10 @@ function updateSwatches() {
     const c = state.previews[fx.id][i];
     if (!c) return;
     const sw = row.querySelector(".swatch");
-    if (sw) sw.style.background = `rgb(${c.red},${c.green},${c.blue})`;
+    if (!sw) return;
+    sw.style.background = `rgb(${c.red},${c.green},${c.blue})`;
+    sw.style.color = `rgb(${c.red},${c.green},${c.blue})`;
+    sw.classList.toggle("swatch-live", c.red + c.green + c.blue > 0);
   });
 }
 
@@ -314,6 +369,7 @@ async function saveFixture() {
   await api(`/api/fixtures/${id}`, { method: "PUT", body: JSON.stringify(body) });
   state.config = await api("/api/config");
   renderFixtureCards();
+  toast("Fixture saved", true);
 }
 
 function autoPatch() {
@@ -324,6 +380,7 @@ function autoPatch() {
     mapping: "linear",
     dmxStart: Number(f.dmxStart.value),
   });
+  toast("Linear patch applied — save to keep", true);
 }
 
 function clearPatch() {
@@ -342,11 +399,20 @@ function exportPatch() {
   a.href = URL.createObjectURL(blob);
   a.download = `${state.selectedFixtureId}-patch.json`;
   a.click();
+  toast("Patch exported", true);
 }
 
 function showPanel(name) {
-  $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
-  $$(".panel").forEach((p) => p.classList.toggle("active", p.id === `panel-${name}`));
+  $$(".rack-btn").forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
+  $$(".deck-panel").forEach((p) => {
+    const active = p.id === `panel-${name}`;
+    p.classList.toggle("active", active);
+    if (active) {
+      p.style.animation = "none";
+      p.offsetHeight;
+      p.style.animation = "";
+    }
+  });
 }
 
 async function addFixture() {
@@ -369,6 +435,7 @@ async function addFixture() {
   populateEditorSelect();
   showPanel("editor");
   loadEditorFixture();
+  toast("Fixture created", true);
 }
 
 function renderAll() {
@@ -383,12 +450,12 @@ function renderAll() {
 }
 
 function bindEvents() {
-  $$(".nav-btn").forEach((btn) => {
+  $$(".rack-btn").forEach((btn) => {
     btn.onclick = () => showPanel(btn.dataset.panel);
   });
-  $("#save-setup").onclick = () => saveSetup().catch((e) => alert(e.message));
-  $("#add-fixture").onclick = () => addFixture().catch((e) => alert(e.message));
-  $("#save-fixture").onclick = () => saveFixture().catch((e) => alert(e.message));
+  $("#save-setup").onclick = () => saveSetup().catch((e) => toast(e.message));
+  $("#add-fixture").onclick = () => addFixture().catch((e) => toast(e.message));
+  $("#save-fixture").onclick = () => saveFixture().catch((e) => toast(e.message));
   $("#auto-patch").onclick = autoPatch;
   $("#clear-patch").onclick = clearPatch;
   $("#export-patch").onclick = exportPatch;
@@ -401,6 +468,7 @@ function bindEvents() {
     fx.mapping = "custom";
     renderPatchTable(fx);
     $("#editor-form").mapping.value = "custom";
+    toast("Patch imported", true);
   };
   $("#editor-fixture-select").onchange = (ev) => {
     state.selectedFixtureId = ev.target.value;
@@ -423,6 +491,7 @@ async function init() {
     renderAll();
   } catch (e) {
     console.error(e);
+    toast(e.message);
   }
 }
 
