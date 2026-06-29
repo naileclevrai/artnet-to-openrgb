@@ -8,12 +8,75 @@ const FPS = Number(process.env.FPS) || 30;
 const FRAME_MS = 1000 / FPS;
 
 const OPENRGB_CONFIG = {
-  name: process.env.OPENRGB_CLIENT_NAME || "ArtNet Keyboard Bridge",
+  name: process.env.OPENRGB_CLIENT_NAME || "ArtNet RGB Bridge",
   host: process.env.OPENRGB_HOST || "127.0.0.1",
   port: Number(process.env.OPENRGB_PORT) || 6742,
 };
 
-const DEVICE_NAME_MATCH = process.env.DEVICE_NAME_MATCH || "G512";
+function listDevices(devices) {
+  return devices
+    .map((d) => `  [${d.deviceId}] ${d.name} (${d.leds.length} LEDs)`)
+    .join("\n");
+}
+
+function selectDevice(devices) {
+  const withLeds = devices.filter((d) => d.leds.length > 0);
+
+  if (withLeds.length === 0) {
+    console.error("No OpenRGB device with addressable LEDs found.");
+    if (devices.length > 0) {
+      console.error("Connected devices:");
+      console.error(listDevices(devices));
+    }
+    process.exit(1);
+  }
+
+  const deviceIdEnv = process.env.DEVICE_ID;
+  if (deviceIdEnv !== undefined && deviceIdEnv !== "") {
+    const id = Number(deviceIdEnv);
+    if (!Number.isInteger(id) || id < 0) {
+      console.error(`Invalid DEVICE_ID: "${deviceIdEnv}" (expected a non-negative integer)`);
+      process.exit(1);
+    }
+
+    const device = withLeds.find((d) => d.deviceId === id);
+    if (!device) {
+      console.error(`Device ID ${id} not found or has no LEDs.`);
+      console.error("Available devices with LEDs:");
+      console.error(listDevices(withLeds));
+      process.exit(1);
+    }
+
+    return device;
+  }
+
+  const nameMatch = process.env.DEVICE_NAME_MATCH;
+  if (nameMatch) {
+    const needle = nameMatch.toLowerCase();
+    const matches = withLeds.filter((d) => d.name.toLowerCase().includes(needle));
+
+    if (matches.length === 0) {
+      console.error(`No device matching "${nameMatch}" found.`);
+      console.error("Available devices with LEDs:");
+      console.error(listDevices(withLeds));
+      process.exit(1);
+    }
+
+    if (matches.length > 1) {
+      console.log(`Multiple devices match "${nameMatch}", using: ${matches[0].name}`);
+    }
+
+    return matches[0];
+  }
+
+  if (withLeds.length > 1) {
+    console.log("Multiple devices available, using the first one with LEDs:");
+    console.log(listDevices(withLeds));
+    console.log("Set DEVICE_ID or DEVICE_NAME_MATCH to target a specific device.");
+  }
+
+  return withLeds[0];
+}
 
 /** @returns {number|false} DMX payload length if packet is ArtDMX, otherwise false */
 function parseArtDmxLength(msg) {
@@ -48,19 +111,12 @@ async function main() {
   }
 
   const devices = await client.getAllControllerData();
-  const keyboard = devices.find((d) => d.name.includes(DEVICE_NAME_MATCH));
+  const device = selectDevice(devices);
 
-  if (!keyboard) {
-    console.error(`No device matching "${DEVICE_NAME_MATCH}" found.`);
-    const names = devices.map((d) => d.name);
-    console.error("Available devices:", names.length ? names.join(", ") : "(none)");
-    process.exit(1);
-  }
-
-  const ledCount = keyboard.leds.length;
+  const ledCount = device.leds.length;
   const neededChannels = ledCount * 3;
 
-  console.log(`Device found: ${keyboard.name}`);
+  console.log(`Device selected: ${device.name} (ID ${device.deviceId})`);
   console.log(`LED count: ${ledCount} (${neededChannels} DMX channels)`);
 
   const dmxBuffer = Buffer.alloc(512);
@@ -105,7 +161,7 @@ async function main() {
     applyDmxToColors(dmxBuffer, ledCount, colors);
 
     try {
-      await client.updateLeds(keyboard.deviceId, colors);
+      await client.updateLeds(device.deviceId, colors);
     } catch (err) {
       console.error("LED update failed:", err.message);
     } finally {

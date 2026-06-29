@@ -1,7 +1,7 @@
 {
   "name": "artnet-to-openrgb",
   "version": "1.0.0",
-  "description": "Bridge Art-Net DMX packets to OpenRGB keyboard LED control",
+  "description": "Bridge Art-Net DMX packets to OpenRGB RGB device control",
   "main": "main.js",
   "scripts": {
     "start": "node main.js"
