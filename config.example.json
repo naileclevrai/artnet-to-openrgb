@@ -1,0 +1,35 @@
+{
+  "protocol": "both",
+  "fps": 30,
+  "debug": false,
+  "ui": { "port": 3000 },
+  "openrgb": {
+    "host": "127.0.0.1",
+    "port": 6742,
+    "clientName": "ArtNet/sACN RGB Bridge"
+  },
+  "artnet": {
+    "port": 6454,
+    "universe": null,
+    "sync": false
+  },
+  "sacn": {
+    "port": 5568,
+    "universes": [1],
+    "iface": null,
+    "reuseAddr": true
+  },
+  "fixtures": [
+    {
+      "id": "keyboard",
+      "name": "Keyboard Main",
+      "deviceId": 0,
+      "zoneId": null,
+      "source": { "type": "artnet", "universes": [1] },
+      "dmxStart": 1,
+      "colorOrder": "RGB",
+      "mapping": "linear",
+      "pixels": []
+    }
+  ]
+}

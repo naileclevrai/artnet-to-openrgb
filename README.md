@@ -1,136 +1,118 @@
 # Art-Net / sACN to OpenRGB Bridge
 
-A lightweight Node.js bridge that receives **Art-Net** or **sACN (E1.31)** DMX packets over UDP and forwards RGB values to any addressable RGB device controlled by [OpenRGB](https://openrgb.org/).
+A Node.js bridge that receives **Art-Net** or **sACN (E1.31)** DMX over UDP and drives any addressable RGB device in [OpenRGB](https://openrgb.org/). Includes a **fixture patch UI** to map DMX channels to OpenRGB pixels — like patching a lighting fixture, but for keyboard LEDs, RAM, strips, and more.
 
-Use it to drive per-LED lighting from lighting consoles (ETC, Onyx), QLC+, Resolume, or any Art-Net / sACN source.
+## Features
 
-> **Branch `feature/sacn`:** adds sACN support alongside Art-Net. Use `PROTOCOL` to choose the input protocol.
+- Art-Net ArtDMX (UDP 6454) and sACN E1.31 (UDP 5568 multicast)
+- **Fixture-based config** — multiple targets, custom DMX channel mapping per LED
+- **Web UI** (always on) at `http://localhost:3000` — protocol setup, fixture editor, live monitor
+- OpenRGB zones, color order (RGB/GRB/BGR…), DMX start offset
+- Art-Net universe filter, Art-Net Sync mode, sACN priority merging
+- Multi-universe DMX (>512 channels), skip unchanged frames, OpenRGB auto-reconnect
+- CLI `--list-devices`, Docker, Windows `.exe` build via `pkg`
 
-## How it works
-
-```
-DMX source (Art-Net or sACN)  --UDP-->  main.js  --OpenRGB SDK-->  OpenRGB  -->  RGB device LEDs
-```
-
-1. The script connects to the OpenRGB SDK server (default `127.0.0.1:6742`).
-2. It selects a target device (first device with LEDs by default, or via `DEVICE_ID` / `DEVICE_NAME_MATCH`).
-3. It listens for DMX data:
-   - **Art-Net:** UDP port **6454**, ArtDMX packets (`opcode 0x5000`)
-   - **sACN:** UDP port **5568**, multicast universes (default universe **1**)
-4. The first `LED count × 3` DMX channels are mapped to RGB values (channel order: R, G, B per LED).
-5. LED updates are sent to OpenRGB at a fixed rate (default **30 FPS**). If multiple frames arrive between ticks, only the latest one is applied.
-
-## Requirements
-
-- [Node.js](https://nodejs.org/) 18 or newer
-- [OpenRGB](https://openrgb.org/) running with **SDK Server** enabled
-- A compatible RGB device detected by OpenRGB (keyboard, mouse, RAM, motherboard, strips, etc.)
-- For sACN: multicast enabled on your network (standard for E1.31)
-
-## Installation
+## Quick start
 
 ```bash
 npm install
-```
-
-## Usage
-
-1. Start OpenRGB and enable the SDK server (Settings → SDK Server).
-2. Confirm your target device appears in OpenRGB.
-3. Run the bridge:
-
-```bash
+cp config.example.json config.json   # or let the app create it on first run
 npm start
 ```
 
-By default, both Art-Net and sACN are enabled (`PROTOCOL=both`).
+Open **http://localhost:3000** to configure fixtures and monitor live output.
 
-Expected output:
+Requires OpenRGB with **SDK Server** enabled.
+
+## Architecture
 
 ```
-Device selected: Corsair G512 RGB (ID 0)
-LED count: 104 (312 DMX channels)
-Protocol mode: both
-Art-Net listening on UDP port 6454
-sACN listening on UDP port 5568 (universes: 1)
-Pushing LED updates to OpenRGB at 30 FPS
+DMX (Art-Net / sACN) → Bridge → Mapping Engine → OpenRGB SDK → RGB device
+                              ↘ Web UI (REST + WebSocket)
 ```
 
-4. Send DMX to this machine. Map universe channels **1–N** to your device LEDs (3 channels per LED, RGB order).
-
-### Protocol examples
-
-Art-Net only:
-
-```powershell
-$env:PROTOCOL = "artnet"
-npm start
-```
-
-sACN only (universe 1):
-
-```powershell
-$env:PROTOCOL = "sacn"
-$env:SACN_UNIVERSES = "1"
-npm start
-```
-
-sACN universe 2 on a specific network interface:
-
-```powershell
-$env:PROTOCOL = "sacn"
-$env:SACN_UNIVERSES = "2"
-$env:SACN_IFACE = "192.168.1.50"
-npm start
-```
+Each **fixture** maps a DMX source (universe(s)) to one OpenRGB device or zone.
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PROTOCOL` | `both` | Input protocol: `artnet`, `sacn`, or `both` |
-| `DEVICE_ID` | *(auto)* | OpenRGB device index (e.g. `0`, `1`). Takes priority over name matching |
-| `DEVICE_NAME_MATCH` | *(none)* | Case-insensitive substring matched against device names |
-| `OPENRGB_HOST` | `127.0.0.1` | OpenRGB SDK server host |
-| `OPENRGB_PORT` | `6742` | OpenRGB SDK server port |
-| `OPENRGB_CLIENT_NAME` | `ArtNet/sACN RGB Bridge` | Client name shown in OpenRGB |
-| `ARTNET_PORT` | `6454` | UDP port for incoming Art-Net |
-| `SACN_UNIVERSES` | `1` | Comma-separated sACN universes to join (e.g. `1,2,3`) |
-| `SACN_PORT` | `5568` | UDP port for incoming sACN |
-| `SACN_IFACE` | *(auto)* | Local IPv4 address of the network interface for multicast |
-| `SACN_REUSE_ADDR` | `true` | Allow multiple apps to listen on the same sACN universe |
-| `FPS` | `30` | Maximum LED update rate sent to OpenRGB |
+Settings live in `config.json` (editable via UI or file). Environment variables override file values.
 
-**Device selection** (first match wins):
+| Key | Default | Description |
+|-----|---------|-------------|
+| `protocol` | `both` | `artnet`, `sacn`, or `both` |
+| `fps` | `30` | Max OpenRGB update rate |
+| `ui.port` | `3000` | Web UI port |
+| `openrgb.host` / `port` | `127.0.0.1` / `6742` | OpenRGB SDK |
+| `artnet.port` | `6454` | Art-Net listen port |
+| `artnet.universe` | `null` | Filter by port address (`null` = all) |
+| `artnet.sync` | `false` | Wait for ArtSync before output |
+| `sacn.universes` | `[1]` | Multicast universes to join |
+| `fixtures[]` | `[]` | Fixture patch list (see below) |
 
-1. `DEVICE_ID` — exact OpenRGB device index
-2. `DEVICE_NAME_MATCH` — partial name match (e.g. `Corsair`, `Wooting`)
-3. If neither is set — first device that has at least one LED
+### Fixture schema
 
-When several devices are connected and no filter is set, the bridge lists them at startup.
+```json
+{
+  "id": "keyboard",
+  "name": "Keyboard Main",
+  "deviceId": 0,
+  "zoneId": null,
+  "source": { "type": "artnet", "universes": [1] },
+  "dmxStart": 1,
+  "colorOrder": "RGB",
+  "mapping": "linear",
+  "pixels": []
+}
+```
 
-## DMX channel mapping
+- **linear** — LED `i` uses DMX channels `dmxStart + 3i`, `+1`, `+2`
+- **custom** — explicit per-LED channels:
 
-For a device with `N` LEDs, channels are laid out as:
+```json
+{ "ledIndex": 42, "label": "Space", "channels": [127, 128, 129] }
+```
 
-| LED index | Red | Green | Blue |
-|-----------|-----|-------|------|
-| 0 | 1 | 2 | 3 |
-| 1 | 4 | 5 | 6 |
-| … | … | … | … |
-| N−1 | 3N−2 | 3N−1 | 3N |
+For >512 channels, use `"universes": [1, 2]` — channel 513 reads universe 2.
 
-Channel numbering follows typical DMX convention (1-based in lighting software; the bridge reads raw byte offsets from the start of the DMX payload).
+## CLI
+
+```bash
+npm start                          # Bridge + UI
+npm run list-devices               # List OpenRGB devices/zones/LEDs
+node src/index.js --config path    # Custom config file
+```
+
+## Docker
+
+```bash
+cp config.example.json config.json
+docker compose up --build
+```
+
+Uses `network_mode: host` for Art-Net and sACN multicast.
+
+## Windows executable
+
+```bash
+npm run build:win
+# Output: dist/artnet-to-openrgb.exe
+```
+
+## UI panels
+
+1. **Setup** — protocol, ports, OpenRGB connection
+2. **Fixtures** — add/remove fixtures
+3. **Patch Editor** — per-LED DMX channel grid, auto-patch, import/export JSON
+4. **Live Monitor** — FPS, packet rate, source/universe, color preview
 
 ## Troubleshooting
 
-| Issue | What to check |
-|-------|----------------|
-| `Failed to connect to OpenRGB` | OpenRGB is running and SDK Server is enabled on the configured host/port |
-| `No device matching "…" found` | Check device names in OpenRGB; set `DEVICE_ID` or `DEVICE_NAME_MATCH` |
-| No LED changes (Art-Net) | Firewall allows UDP 6454; packets are ArtDMX with enough channels |
-| No LED changes (sACN) | Multicast enabled; correct `SACN_UNIVERSES`; try `SACN_IFACE` if multiple NICs |
-| Choppy updates | Lower source send rate or increase `FPS` (OpenRGB/hardware may limit throughput) |
+| Issue | Check |
+|-------|-------|
+| UI loads but no LEDs change | Fixture device ID, universe, enough DMX channels |
+| OpenRGB disconnected | SDK server enabled; bridge auto-reconnects |
+| sACN not received | Multicast enabled; correct universe; try `sacn.iface` |
+| Wrong colors | `colorOrder` setting per fixture |
 
 ## License
 
