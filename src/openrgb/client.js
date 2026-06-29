@@ -10,6 +10,8 @@ class OpenRgbManager extends EventEmitter {
     this.retryMs = 1000;
     this.maxRetryMs = 30000;
     this.devices = [];
+    this._backgroundConnect = false;
+    this._warnedOffline = false;
   }
 
   async connect() {
@@ -24,7 +26,9 @@ class OpenRgbManager extends EventEmitter {
       this.devices = await this.client.getAllControllerData();
       this.status = "connected";
       this.retryMs = 1000;
+      this._warnedOffline = false;
       this.emit("status", this.status);
+      this.emit("ready", this.devices);
       return this.devices;
     } catch (err) {
       this.status = "error";
@@ -33,28 +37,48 @@ class OpenRgbManager extends EventEmitter {
     }
   }
 
-  async ensureConnected() {
-    if (this.client?.isConnected) return;
-    await this.connectWithRetry();
+  startBackgroundConnect() {
+    if (this._backgroundConnect) return;
+    this._backgroundConnect = true;
+
+    const loop = async () => {
+      while (this._backgroundConnect) {
+        if (this.client?.isConnected) {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        try {
+          await this.connect();
+        } catch (err) {
+          this.status = "reconnecting";
+          this.emit("status", this.status, err.message);
+          if (!this._warnedOffline) {
+            const { host, port } = this.config.openrgb;
+            console.warn(`OpenRGB not available at ${host}:${port} (${err.message})`);
+            console.warn("Bridge and UI are running — enable OpenRGB SDK Server to drive LEDs.");
+            this._warnedOffline = true;
+          }
+          await new Promise((r) => setTimeout(r, this.retryMs));
+          this.retryMs = Math.min(this.retryMs * 2, this.maxRetryMs);
+        }
+      }
+    };
+
+    loop().catch(() => {});
   }
 
-  async connectWithRetry() {
-    while (true) {
-      try {
-        await this.connect();
-        return;
-      } catch (err) {
-        this.status = "reconnecting";
-        this.emit("status", this.status, err.message);
-        console.error(`OpenRGB reconnect in ${this.retryMs}ms: ${err.message}`);
-        await new Promise((r) => setTimeout(r, this.retryMs));
-        this.retryMs = Math.min(this.retryMs * 2, this.maxRetryMs);
-      }
-    }
+  stopBackgroundConnect() {
+    this._backgroundConnect = false;
+  }
+
+  isConnected() {
+    return Boolean(this.client?.isConnected);
   }
 
   async refreshDevices() {
-    await this.ensureConnected();
+    if (!this.isConnected()) {
+      throw new Error("OpenRGB not connected");
+    }
     this.devices = await this.client.getAllControllerData();
     return this.devices;
   }
@@ -64,7 +88,7 @@ class OpenRgbManager extends EventEmitter {
   }
 
   async updateFixture(compiled) {
-    await this.ensureConnected();
+    if (!this.isConnected()) return false;
     const { deviceId, zoneId, colors } = compiled;
 
     try {
@@ -77,15 +101,17 @@ class OpenRgbManager extends EventEmitter {
         this.status = "connected";
         this.emit("status", this.status);
       }
+      return true;
     } catch (err) {
       this.status = "error";
       this.emit("status", this.status, err.message);
-      this.client.isConnected = false;
+      if (this.client) this.client.isConnected = false;
       throw err;
     }
   }
 
   disconnect() {
+    this.stopBackgroundConnect();
     if (this.client) {
       try {
         this.client.disconnect();

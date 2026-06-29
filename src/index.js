@@ -83,7 +83,9 @@ async function main() {
     });
   });
 
-  await bridge.start();
+  await bridge.start().catch((err) => {
+    console.error("Bridge start error:", err.message);
+  });
 }
 
 main().catch((err) => {

@@ -41,23 +41,30 @@ class Bridge extends EventEmitter {
   }
 
   async compileFixtures() {
-    const devices = await this.openRgb.refreshDevices();
-    this.compiledFixtures = [];
+    try {
+      const devices = await this.openRgb.refreshDevices();
+      this.compiledFixtures = [];
 
-    for (const fixture of this.config.fixtures) {
-      const device = devices.find((d) => d.deviceId === fixture.deviceId);
-      if (!device) {
-        console.warn(`Fixture "${fixture.id}": device ${fixture.deviceId} not found, skipped`);
-        continue;
+      for (const fixture of this.config.fixtures) {
+        const device = devices.find((d) => d.deviceId === fixture.deviceId);
+        if (!device) {
+          console.warn(`Fixture "${fixture.id}": device ${fixture.deviceId} not found, skipped`);
+          continue;
+        }
+        this.compiledFixtures.push(compileFixture(fixture, device));
       }
-      this.compiledFixtures.push(compileFixture(fixture, device));
-    }
 
-    const warnings = validateFixtureChannels(this.config.fixtures);
-    for (const w of warnings) console.warn(w);
+      const warnings = validateFixtureChannels(this.config.fixtures);
+      for (const w of warnings) console.warn(w);
 
-    if (this.compiledFixtures.length === 0 && this.config.fixtures.length > 0) {
-      console.warn("No fixtures could be compiled. Configure devices in the UI.");
+      if (this.compiledFixtures.length === 0 && this.config.fixtures.length > 0) {
+        console.warn("No fixtures could be compiled. Check device IDs in the UI.");
+      }
+    } catch (err) {
+      this.compiledFixtures = [];
+      if (this.openRgb.isConnected()) {
+        console.warn(`Fixture compile failed: ${err.message}`);
+      }
     }
   }
 
@@ -134,7 +141,10 @@ class Bridge extends EventEmitter {
     if (this.running) return;
     this.running = true;
 
-    await this.openRgb.connect();
+    this.openRgb.on("ready", () => {
+      this.compileFixtures().catch(() => {});
+    });
+    this.openRgb.startBackgroundConnect();
     await this.compileFixtures();
     this.restartReceivers();
 
@@ -175,13 +185,13 @@ class Bridge extends EventEmitter {
       }
 
       try {
-        await this.openRgb.updateFixture(compiled);
+        const updated = await this.openRgb.updateFixture(compiled);
+        if (!updated) continue;
         compiled.lastHash = hash;
         this.stats.updates++;
         previews[compiled.id] = compiled.colors;
       } catch (err) {
         console.error(`Fixture "${compiled.id}" update failed:`, err.message);
-        await this.openRgb.connectWithRetry();
       }
     }
 
